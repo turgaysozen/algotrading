@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  algo-trading:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: algo-trading
+    environment:
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_SSLMODE=${DB_SSLMODE}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: always
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    environment:
+      - REDIS_PORT=${REDIS_PORT}
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    restart: always
+
+  db:
+    image: timescale/timescaledb-ha:pg14.15-ts2.18.1-oss
+    container_name: db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    restart: always
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      retries: 3
+      start_period: 5s
+      timeout: 3s
+
+volumes:
+  db_data:
