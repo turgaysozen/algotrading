@@ -9,6 +9,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+var Database *sql.DB
+
 func InitializeDB() (*sql.DB, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -25,16 +27,16 @@ func InitializeDB() (*sql.DB, error) {
 
 	connStr := "user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " host=" + dbHost + " port=" + dbPort + " sslmode=" + dbSslMode
 
-	db, err := sql.Open("postgres", connStr)
+	Database, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal("Error opening database connection: ", err)
 		return nil, err
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := Database.Ping(); err != nil {
 		log.Fatal("Error connecting to the database: ", err)
 		return nil, err
 	}
 
-	return db, nil
+	return Database, nil
 }

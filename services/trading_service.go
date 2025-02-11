@@ -1,20 +1,18 @@
 package services
 
 import (
-	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/turgaysozen/algotrading/config"
+	"github.com/turgaysozen/algotrading/db"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/utils"
 )
 
-var priceData []float64
-var counter int = 1
-var lastSignal string
-var orders []models.Order
-var signals []models.Signal
-var orderID int
+var priceDataMap sync.Map
+var lastSignalMap sync.Map
 
 func ProcessOrderBook(orderBook models.OrderBook) {
 	if len(orderBook.Bids) == 0 || len(orderBook.Asks) == 0 {
@@ -22,42 +20,54 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 		return
 	}
 
-	bidPrice := utils.StringToFloat64(orderBook.Bids[0][0].(string))
-	askPrice := utils.StringToFloat64(orderBook.Asks[0][0].(string))
+	bidPrice := GetBestBidPrice(orderBook.Bids)
+	askPrice := GetBestAskPrice(orderBook.Asks)
 	midPrice := (bidPrice + askPrice) / 2
 
-	log.Printf(
-		"Counter: %d, Symbol: %s, EventTime: %d, Bid Price: %.2f, Ask Price: %.2f, Mid Price: %.2f\n",
-		counter,
-		orderBook.Symbol,
-		orderBook.EventTime,
-		bidPrice,
-		askPrice,
-		midPrice,
-	)
+	orderBookID, err := db.SaveOrderBook(orderBook.EventType, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice)
+	if err != nil {
+		log.Printf("Error saving order book: %v", err)
+		return
+	}
 
-	priceData = append(priceData, midPrice)
+	log.Printf("ID: %d | Symbol: %s | EventTime: %d | Bid: %.2f | Ask: %.2f | Mid Price: %.2f\n",
+		orderBookID, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice, midPrice)
 
-	if len(priceData) >= 200 {
-		shortSMA := CalculateSMA(priceData, 50)
-		longSMA := CalculateSMA(priceData, 200)
+	value, _ := priceDataMap.LoadOrStore(orderBook.Symbol, &[]float64{})
+	priceData := value.(*[]float64)
 
-		log.Printf("Short SMA: %.2f, Long SMA: %.2f, Mid Price: %.2f\n", shortSMA, longSMA, midPrice)
+	appendPriceData(priceData, midPrice)
+
+	if len(*priceData) >= config.MaxPriceCount {
+		shortSMA := CalculateSMA(*priceData, config.ShortSMACount)
+		longSMA := CalculateSMA(*priceData, config.LongSMACount)
+
+		value, _ := lastSignalMap.LoadOrStore(orderBook.Symbol, "")
+		lastSignal := value.(string)
 
 		newSignal, reason := CheckSignal(shortSMA, longSMA, lastSignal)
 
 		if newSignal != lastSignal {
-			executeTrade(newSignal, midPrice, shortSMA, longSMA, reason)
+			lastSignalMap.Store(orderBook.Symbol, newSignal)
+			executeTrade(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol)
 		}
 	}
-
-	counter++
 }
 
-func executeTrade(newSignal string, midPrice, shortSMA, longSMA float64, reason string) {
-	if len(orders) > 0 && orders[len(orders)-1].Status == "open" {
-		orders[len(orders)-1].Status = "closed"
-		log.Printf("Closing last order with ID: %d\n", orders[len(orders)-1].ID)
+func executeTrade(newSignal string, midPrice, shortSMA, longSMA float64, reason, symbol string) {
+	lastOrder, err := db.GetLastOpenOrder()
+	if err != nil {
+		log.Printf("Error retrieving last open order: %v", err)
+		return
+	}
+
+	if lastOrder != nil {
+		err := db.CloseOrder(lastOrder.ID)
+		if err != nil {
+			log.Printf("Error closing last open order: %v", err)
+			return
+		}
+		log.Printf("Closing last order with ID: %d\n", lastOrder.ID)
 	}
 
 	orderType := "sell"
@@ -65,29 +75,75 @@ func executeTrade(newSignal string, midPrice, shortSMA, longSMA float64, reason 
 		orderType = "buy"
 	}
 
-	orderID++
-
-	orders = append(orders, models.Order{
-		ID:        orderID,
+	order := models.Order{
 		Price:     midPrice,
 		Quantity:  1.0,
 		Status:    "open",
 		OrderType: orderType,
-	})
+	}
 
-	fmt.Println("order list:", orders)
+	err = db.SaveOrder(order)
+	if err != nil {
+		log.Printf("Error saving order: %v", err)
+		return
+	}
 
-	signals = append(signals, models.Signal{
-		Timestamp: time.Now(),
-		Type:      newSignal,
-		Price:     midPrice,
-		ShortSMA:  shortSMA,
-		LongSMA:   longSMA,
-		Reason:    reason,
-	})
+	signal := models.Signal{
+		Type:     newSignal,
+		Price:    midPrice,
+		ShortSMA: shortSMA,
+		LongSMA:  longSMA,
+		Reason:   reason,
+	}
 
-	fmt.Println("signal list:", signals)
+	err = db.SaveSignal(signal)
+	if err != nil {
+		log.Printf("Error saving signal: %v", err)
+		return
+	}
 
-	lastSignal = newSignal
-	fmt.Println(newSignal)
+	// lastSignal = newSignal
+	lastSignalMap.Store(symbol, newSignal)
+
+	log.Printf("Signal saved successfully: Type= %s, Price= %.2f, ShortSMA= %.2f, LongSMA= %.2f, Reason= %s, Timestamp= %s",
+		signal.Type, signal.Price, signal.ShortSMA, signal.LongSMA, signal.Reason, time.Now())
+}
+
+func GetBestBidPrice(bids [][]interface{}) float64 {
+	if len(bids) == 0 {
+		return 0
+	}
+
+	bestBid := bids[0]
+	for _, bid := range bids {
+		bidPrice := utils.StringToFloat64(bid[0].(string))
+		if bidPrice > utils.StringToFloat64(bestBid[0].(string)) {
+			bestBid = bid
+		}
+	}
+	return utils.StringToFloat64(bestBid[0].(string))
+}
+
+func GetBestAskPrice(asks [][]interface{}) float64 {
+	if len(asks) == 0 {
+		return 0
+	}
+
+	bestAsk := asks[0]
+	for _, ask := range asks {
+		askPrice := utils.StringToFloat64(ask[0].(string))
+		if askPrice < utils.StringToFloat64(bestAsk[0].(string)) {
+			bestAsk = ask
+		}
+	}
+	return utils.StringToFloat64(bestAsk[0].(string))
+}
+
+func appendPriceData(priceData *[]float64, midPrice float64) {
+	*priceData = append(*priceData, midPrice)
+
+	// Keep last 200 records
+	if len(*priceData) > config.MaxPriceCount {
+		*priceData = (*priceData)[1:]
+	}
 }

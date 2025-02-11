@@ -1,9 +1,5 @@
 package models
 
-import (
-	"time"
-)
-
 type OrderBook struct {
 	EventType string          `json:"e"`
 	Symbol    string          `json:"s"`
@@ -21,10 +17,9 @@ type Order struct {
 }
 
 type Signal struct {
-	Timestamp time.Time `json:"timestamp"`
-	Type      string    `json:"type"`
-	Price     float64   `json:"price"`
-	ShortSMA  float64   `json:"short_sma"`
-	LongSMA   float64   `json:"long_sma"`
-	Reason    string    `json:"reason"`
+	Type     string  `json:"type"`
+	Price    float64 `json:"price"`
+	ShortSMA float64 `json:"short_sma"`
+	LongSMA  float64 `json:"long_sma"`
+	Reason   string  `json:"reason"`
 }
