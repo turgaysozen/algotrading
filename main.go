@@ -16,7 +16,7 @@ func main() {
 
 	go wsclient.ProcessWebSocketMessages(conn)
 
-	go redisclient.SubscribeToRedis()
+	go redisclient.Subscribe()
 
 	select {}
 }

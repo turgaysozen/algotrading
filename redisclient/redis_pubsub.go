@@ -51,17 +51,7 @@ func Publish(channel string, message interface{}) {
 	}
 }
 
-func Subscribe(channel string, handler func([]byte)) {
-	client := NewRedisClient()
-	sub := client.Subscribe(ctx, channel)
-
-	ch := sub.Channel()
-	for msg := range ch {
-		handler([]byte(msg.Payload))
-	}
-}
-
-func SubscribeToRedis() {
+func Subscribe() {
 	client := NewRedisClient()
 	sub := client.Subscribe(ctx, "order_book")
 
