@@ -26,7 +26,15 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 	askPrice := utils.StringToFloat64(orderBook.Asks[0][0].(string))
 	midPrice := (bidPrice + askPrice) / 2
 
-	log.Printf("Counter: %d, Bid Price: %.2f, Ask Price: %.2f, Mid Price: %.2f\n", counter, bidPrice, askPrice, midPrice)
+	log.Printf(
+		"Counter: %d, Symbol: %s, EventTime: %d, Bid Price: %.2f, Ask Price: %.2f, Mid Price: %.2f\n",
+		counter,
+		orderBook.Symbol,
+		orderBook.EventTime,
+		bidPrice,
+		askPrice,
+		midPrice,
+	)
 
 	priceData = append(priceData, midPrice)
 
@@ -34,7 +42,7 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 		shortSMA := CalculateSMA(priceData, 50)
 		longSMA := CalculateSMA(priceData, 200)
 
-		fmt.Printf("Short SMA: %.2f, Long SMA: %.2f, Mid Price: %.2f\n", shortSMA, longSMA, midPrice)
+		log.Printf("Short SMA: %.2f, Long SMA: %.2f, Mid Price: %.2f\n", shortSMA, longSMA, midPrice)
 
 		newSignal, reason := CheckSignal(shortSMA, longSMA, lastSignal)
 

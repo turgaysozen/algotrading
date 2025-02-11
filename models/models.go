@@ -1,10 +1,15 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type OrderBook struct {
-	Bids [][]interface{} `json:"b"`
-	Asks [][]interface{} `json:"a"`
+	EventType string          `json:"e"`
+	Symbol    string          `json:"s"`
+	EventTime int64           `json:"E"`
+	Bids      [][]interface{} `json:"b"`
+	Asks      [][]interface{} `json:"a"`
 }
 
 type Order struct {

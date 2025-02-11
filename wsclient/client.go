@@ -28,7 +28,7 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 		return nil, err
 	}
 
-	log.Println("WebSocket connected.")
+	log.Println("WebSocket connected to:", url)
 	return c, nil
 }
 

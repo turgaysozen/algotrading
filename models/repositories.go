@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-func SaveOrderBook(db *sql.DB, orderBook OrderBook, timestamp time.Time) error {
+func SaveOrderBook(db *sql.DB, orderBook OrderBook) error {
 	_, err := db.Exec(
-		"INSERT INTO order_books (timestamp, bids, asks) VALUES ($1, $2, $3)",
-		timestamp, orderBook.Bids, orderBook.Asks,
+		"INSERT INTO order_books (symbol, timestamp, bids, asks) VALUES ($1, $2, $3, $4)",
+		orderBook.Symbol, orderBook.EventTime, orderBook.Bids, orderBook.Asks,
 	)
 	if err != nil {
 		log.Printf("Error saving order book: %v", err)
