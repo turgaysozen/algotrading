@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -90,21 +91,17 @@ func RecordLatency(metricType, latencyTrackingID string) {
 }
 
 func CollectSystemMetrics() {
-	// Collect CPU usage metrics
-	cpuPercent, err := cpu.Percent(0, true) // 'true' to get per-core usage
+	cpuPercent, err := cpu.Percent(0, true)
 	if err != nil {
 		log.Println("Error collecting CPU usage:", err)
 	}
 	for i, percent := range cpuPercent {
-		cpuUsage.WithLabelValues(string(i)).Set(percent)
+		cpuUsage.WithLabelValues(strconv.Itoa(i)).Set(percent)
 	}
 
-	// Collect memory usage metrics
 	vmStat, err := mem.VirtualMemory()
 	if err != nil {
 		log.Println("Error collecting memory usage:", err)
 	}
 	memoryUsage.Set(float64(vmStat.Used))
-
-	// Optionally, you can call this function periodically
 }
