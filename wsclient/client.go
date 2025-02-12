@@ -6,8 +6,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
+	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/redisclient"
 )
@@ -62,12 +64,18 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 			continue
 		}
 
+		// track latency for orderbook data processing
+		LatencyTrackingID := uuid.New().String()
+		metrics.SetStartTime("orderbook", LatencyTrackingID)
+
 		var orderBook models.OrderBook
 		err = json.Unmarshal(msg, &orderBook)
 		if err != nil {
 			log.Println("Error unmarshalling WebSocket message:", err)
 			continue
 		}
+
+		orderBook.LatencyTrackingID = LatencyTrackingID
 
 		redisclient.Publish("order_book", orderBook)
 	}

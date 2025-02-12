@@ -8,6 +8,7 @@ import (
 
 	"github.com/turgaysozen/algotrading/config"
 	"github.com/turgaysozen/algotrading/db"
+	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/utils"
 )
@@ -31,8 +32,14 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 		return
 	}
 
+	metrics.RecordLatency("orderbook", orderBook.LatencyTrackingID)
+
 	log.Printf("ID: %d | Symbol: %s | EventTime: %d | Bid: %.2f | Ask: %.2f | Mid Price: %.2f\n",
 		orderBookID, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice, midPrice)
+
+	// track latency metrics for signal and order
+	metrics.SetStartTime("signal", orderBook.LatencyTrackingID)
+	metrics.SetStartTime("order", orderBook.LatencyTrackingID)
 
 	value, _ := priceDataMap.LoadOrStore(orderBook.Symbol, &[]float64{})
 	priceData := value.(*[]float64)
@@ -50,12 +57,12 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 
 		if newSignal != lastSignal {
 			lastSignalMap.Store(orderBook.Symbol, newSignal)
-			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol)
+			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol, orderBook.LatencyTrackingID)
 		}
 	}
 }
 
-func saveSignal(newSignal string, midPrice, shortSMA, longSMA float64, reason, symbol string) {
+func saveSignal(newSignal string, midPrice, shortSMA, longSMA float64, reason, symbol, latencyTrackingID string) {
 	signal := models.Signal{
 		Type:     newSignal,
 		Price:    midPrice,
@@ -73,10 +80,11 @@ func saveSignal(newSignal string, midPrice, shortSMA, longSMA float64, reason, s
 	signalJSON, _ := json.MarshalIndent(signal, "", "  ")
 	log.Println("Signal saved successfully:", string(signalJSON))
 
-	saveOrder(newSignal, midPrice, symbol)
+	saveOrder(newSignal, midPrice, symbol, latencyTrackingID)
+	metrics.RecordLatency("signal", latencyTrackingID)
 }
 
-func saveOrder(newSignal string, midPrice float64, symbol string) {
+func saveOrder(newSignal string, midPrice float64, symbol, latencyTrackingID string) {
 	lastOrder, err := db.GetLastOpenOrder()
 	if err != nil {
 		log.Printf("Error retrieving last open order: %v", err)
@@ -112,6 +120,7 @@ func saveOrder(newSignal string, midPrice float64, symbol string) {
 
 	log.Printf("Order saved successfully: Type= %s, Price= %.2f, Symbol= %s, Timestamp= %s",
 		orderType, midPrice, symbol, time.Now())
+	metrics.RecordLatency("order", latencyTrackingID)
 }
 
 func GetBestBidPrice(bids [][]interface{}) float64 {
