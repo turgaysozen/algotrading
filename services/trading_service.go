@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -49,12 +50,33 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 
 		if newSignal != lastSignal {
 			lastSignalMap.Store(orderBook.Symbol, newSignal)
-			executeTrade(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol)
+			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol)
 		}
 	}
 }
 
-func executeTrade(newSignal string, midPrice, shortSMA, longSMA float64, reason, symbol string) {
+func saveSignal(newSignal string, midPrice, shortSMA, longSMA float64, reason, symbol string) {
+	signal := models.Signal{
+		Type:     newSignal,
+		Price:    midPrice,
+		ShortSMA: shortSMA,
+		LongSMA:  longSMA,
+		Reason:   reason,
+	}
+
+	err := db.SaveSignal(signal)
+	if err != nil {
+		log.Printf("Error saving signal: %v", err)
+		return
+	}
+
+	signalJSON, _ := json.MarshalIndent(signal, "", "  ")
+	log.Println("Signal saved successfully:", string(signalJSON))
+
+	saveOrder(newSignal, midPrice, symbol)
+}
+
+func saveOrder(newSignal string, midPrice float64, symbol string) {
 	lastOrder, err := db.GetLastOpenOrder()
 	if err != nil {
 		log.Printf("Error retrieving last open order: %v", err)
@@ -88,25 +110,8 @@ func executeTrade(newSignal string, midPrice, shortSMA, longSMA float64, reason,
 		return
 	}
 
-	signal := models.Signal{
-		Type:     newSignal,
-		Price:    midPrice,
-		ShortSMA: shortSMA,
-		LongSMA:  longSMA,
-		Reason:   reason,
-	}
-
-	err = db.SaveSignal(signal)
-	if err != nil {
-		log.Printf("Error saving signal: %v", err)
-		return
-	}
-
-	// lastSignal = newSignal
-	lastSignalMap.Store(symbol, newSignal)
-
-	log.Printf("Signal saved successfully: Type= %s, Price= %.2f, ShortSMA= %.2f, LongSMA= %.2f, Reason= %s, Timestamp= %s",
-		signal.Type, signal.Price, signal.ShortSMA, signal.LongSMA, signal.Reason, time.Now())
+	log.Printf("Order saved successfully: Type= %s, Price= %.2f, Symbol= %s, Timestamp= %s",
+		orderType, midPrice, symbol, time.Now())
 }
 
 func GetBestBidPrice(bids [][]interface{}) float64 {
