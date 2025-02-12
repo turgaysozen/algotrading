@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -13,6 +14,7 @@ import (
 )
 
 var ctx = context.Background()
+var connected bool = false
 
 func NewRedisClient() *redis.Client {
 	err := godotenv.Load()
@@ -23,13 +25,36 @@ func NewRedisClient() *redis.Client {
 	redisHost := os.Getenv("REDIS_HOST")
 	redisPort := os.Getenv("REDIS_PORT")
 
-	client := redis.NewClient(&redis.Options{
-		Addr: redisHost + ":" + redisPort,
-	})
+	addr := redisHost + ":" + redisPort
+	maxRetries := 5
+	retryCount := 0
 
-	_, err = client.Ping(context.Background()).Result()
-	if err != nil {
-		log.Fatal("Error connecting to Redis: ", err)
+	var client *redis.Client
+
+	for {
+		client = redis.NewClient(&redis.Options{
+			Addr: addr,
+		})
+
+		_, err = client.Ping(context.Background()).Result()
+		if err != nil {
+			connected = false
+			retryCount++
+			log.Printf("Error connecting to Redis, retrying %d/%d... %v", retryCount, maxRetries, err)
+			client.Close()
+			if retryCount >= maxRetries {
+				log.Fatal("Max retry attempts reached, giving up.")
+			}
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if !connected {
+			log.Println("Connected to Redis")
+			connected = true
+		}
+
+		break
 	}
 
 	return client

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -23,20 +24,42 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 		log.Fatal("WebSocket URL not set in .env file")
 	}
 
-	c, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		return nil, err
+	var conn *websocket.Conn
+	var connectErr error
+	maxRetries := 5
+	retryCount := 0
+
+	for {
+		conn, _, connectErr = websocket.DefaultDialer.Dial(url, nil)
+		if connectErr != nil {
+			retryCount++
+			log.Printf("Error connecting to WebSocket, retrying %d/%d... %v", retryCount, maxRetries, connectErr)
+			if retryCount >= maxRetries {
+				log.Fatal("Max retry attempts reached, giving up.")
+				return nil, connectErr
+			}
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		log.Println("WebSocket connected to:", url)
+		break
 	}
 
-	log.Println("WebSocket connected to:", url)
-	return c, nil
+	return conn, nil
 }
 
 func ProcessWebSocketMessages(conn *websocket.Conn) {
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Fatal("Error reading WebSocket message:", err)
+			log.Println("Error reading WebSocket message:", err)
+			conn.Close()
+			conn, err = ConnectWebSocket()
+			if err != nil {
+				log.Fatal("Error reconnecting to WebSocket:", err)
+			}
+			continue
 		}
 
 		var orderBook models.OrderBook
