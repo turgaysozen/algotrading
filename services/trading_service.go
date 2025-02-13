@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turgaysozen/algotrading/config"
 	"github.com/turgaysozen/algotrading/db"
 	"github.com/turgaysozen/algotrading/metrics"
@@ -32,14 +33,16 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 		return
 	}
 
-	metrics.RecordLatency("orderbook", orderBook.LatencyTrackingID)
+	metrics.RecordLatency("orderbook_single", orderBook.LatencyTrackingID)
+	metrics.RecordLatency("orderbook_avg", "")
 
 	log.Printf("ID: %d | Symbol: %s | EventTime: %d | Bid: %.2f | Ask: %.2f | Mid Price: %.2f\n",
 		orderBookID, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice, midPrice)
 
 	// track latency metrics for signal and order
-	metrics.SetStartTime("signal", orderBook.LatencyTrackingID)
-	metrics.SetStartTime("order", orderBook.LatencyTrackingID)
+	latencyTrackingID := uuid.New().String()
+	metrics.SetStartTime("signal", latencyTrackingID)
+	metrics.SetStartTime("order", latencyTrackingID)
 
 	value, _ := priceDataMap.LoadOrStore(orderBook.Symbol, &[]float64{})
 	priceData := value.(*[]float64)
@@ -57,7 +60,7 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 
 		if newSignal != lastSignal {
 			lastSignalMap.Store(orderBook.Symbol, newSignal)
-			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol, orderBook.LatencyTrackingID)
+			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol, latencyTrackingID)
 		}
 	}
 }

@@ -64,9 +64,10 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		// track latency for orderbook data processing
-		LatencyTrackingID := uuid.New().String()
-		metrics.SetStartTime("orderbook", LatencyTrackingID)
+		// track latency for orderbook single data processing and avg processing
+		latencyTrackingID := uuid.New().String()
+		metrics.SetStartTime("orderbook_single", latencyTrackingID)
+		metrics.SetStartTime("orderbook_avg", "")
 
 		var orderBook models.OrderBook
 		err = json.Unmarshal(msg, &orderBook)
@@ -75,7 +76,7 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		orderBook.LatencyTrackingID = LatencyTrackingID
+		orderBook.LatencyTrackingID = latencyTrackingID
 
 		redisclient.Publish("order_book", orderBook)
 	}

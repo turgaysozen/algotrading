@@ -4,6 +4,7 @@ import (
 	"log"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,29 +12,33 @@ import (
 )
 
 var (
-	orderbookProcessingLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "orderbook_processing_latency_seconds",
-			Help:    "Latency of processing order book data",
-			Buckets: prometheus.DefBuckets,
+	orderbookAvgLatency = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "orderbook_avg_processing_latency_seconds",
+			Help: "Average latency of processing order book data",
+		},
+	)
+
+	orderbookSingleProcessingLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "orderbook_single_processing_latency_seconds",
+			Help: "Latency of processing single order book data",
 		},
 		[]string{"latencyTrackingID"},
 	)
 
-	tradeSignalLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "trade_signal_latency_seconds",
-			Help:    "Latency of generating trade signals",
-			Buckets: prometheus.DefBuckets,
+	tradeSignalLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "trade_signal_latency_seconds",
+			Help: "Latency of generating trade signals",
 		},
 		[]string{"latencyTrackingID"},
 	)
 
-	orderExecutionLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "order_execution_latency_seconds",
-			Help:    "Latency of executing trade orders",
-			Buckets: prometheus.DefBuckets,
+	orderExecutionLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "order_execution_latency_seconds",
+			Help: "Latency of executing trade orders",
 		},
 		[]string{"latencyTrackingID"},
 	)
@@ -53,12 +58,16 @@ var (
 		},
 	)
 
-	activeTimers = make(map[string]time.Time)
+	activeTimers  = make(map[string]time.Time)
+	latencySums   = make(map[string]float64)
+	latencyCounts = make(map[string]int)
+	latencyMutex  = sync.Mutex{}
 )
 
 func init() {
 	prometheus.MustRegister(
-		orderbookProcessingLatency,
+		orderbookAvgLatency,
+		orderbookSingleProcessingLatency,
 		tradeSignalLatency,
 		orderExecutionLatency,
 		cpuUsage,
@@ -79,15 +88,28 @@ func RecordLatency(metricType, latencyTrackingID string) {
 	latency := time.Since(startTime).Seconds()
 
 	switch metricType {
-	case "orderbook":
-		orderbookProcessingLatency.WithLabelValues(latencyTrackingID).Observe(latency)
+	case "orderbook_avg":
+		orderbookAvgLatency.Set(updateAverageLatency("avg", latency))
+	case "orderbook_single":
+		orderbookSingleProcessingLatency.WithLabelValues(latencyTrackingID).Set(latency)
 	case "signal":
-		tradeSignalLatency.WithLabelValues(latencyTrackingID).Observe(latency)
+		tradeSignalLatency.WithLabelValues(latencyTrackingID).Set(latency)
 	case "order":
-		orderExecutionLatency.WithLabelValues(latencyTrackingID).Observe(latency)
+		orderExecutionLatency.WithLabelValues(latencyTrackingID).Set(latency)
 	}
 
 	delete(activeTimers, metricType+latencyTrackingID)
+}
+
+func updateAverageLatency(metricType string, latency float64) float64 {
+	latencyMutex.Lock()
+	defer latencyMutex.Unlock()
+
+	latencySums[metricType] += latency
+	latencyCounts[metricType]++
+
+	avgLatency := latencySums[metricType] / float64(latencyCounts[metricType])
+	return avgLatency
 }
 
 func CollectSystemMetrics() {
