@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/turgaysozen/algotrading/metrics"
 )
 
 var Database *sql.DB
@@ -16,6 +17,7 @@ func InitializeDB() (*sql.DB, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
+		metrics.RecordError("db_load_env_error")
 		return nil, err
 	}
 
@@ -31,6 +33,7 @@ func InitializeDB() (*sql.DB, error) {
 	Database, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal("Error opening database connection: ", err)
+		metrics.RecordError("db_open_connection_error")
 		return nil, err
 	}
 
@@ -40,6 +43,7 @@ func InitializeDB() (*sql.DB, error) {
 
 	if err := Database.Ping(); err != nil {
 		log.Fatal("Error connecting to the database: ", err)
+		metrics.RecordError("db_ping_error")
 		return nil, err
 	}
 

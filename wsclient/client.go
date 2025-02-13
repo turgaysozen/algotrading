@@ -18,12 +18,14 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
+		metrics.RecordError("env_file_load_error")
 	}
 
 	url := os.Getenv("WEB_SOCKET_URL")
 
 	if url == "" {
 		log.Fatal("WebSocket URL not set in .env file")
+		metrics.RecordError("websocket_url_missing")
 	}
 
 	var conn *websocket.Conn
@@ -36,8 +38,10 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 		if connectErr != nil {
 			retryCount++
 			log.Printf("Error connecting to WebSocket, retrying %d/%d... %v", retryCount, maxRetries, connectErr)
+			metrics.RecordError("websocket_connection_error")
 			if retryCount >= maxRetries {
 				log.Fatal("Max retry attempts reached, giving up.")
+				metrics.RecordDataLoss("websocket_connection_max_retries")
 				return nil, connectErr
 			}
 			time.Sleep(5 * time.Second)
@@ -56,6 +60,7 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			log.Println("Error reading WebSocket message:", err)
+			metrics.RecordError("websocket_connection_error")
 			conn.Close()
 			conn, err = ConnectWebSocket()
 			if err != nil {
@@ -73,6 +78,8 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 		err = json.Unmarshal(msg, &orderBook)
 		if err != nil {
 			log.Println("Error unmarshalling WebSocket message:", err)
+			metrics.RecordError("json_unmarshal_error")
+			metrics.RecordDataLoss("json_unmarshal_data_loss")
 			continue
 		}
 

@@ -58,6 +58,22 @@ var (
 		},
 	)
 
+	errors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "error_count",
+			Help: "Total number of errors in the system",
+		},
+		[]string{"error_type"},
+	)
+
+	dataLoss = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "dataloss_error_count",
+			Help: "Total number of data loss events",
+		},
+		[]string{"data_loss_type"},
+	)
+
 	activeTimers  = make(map[string]time.Time)
 	latencySums   = make(map[string]float64)
 	latencyCounts = make(map[string]int)
@@ -72,6 +88,8 @@ func init() {
 		orderExecutionLatency,
 		cpuUsage,
 		memoryUsage,
+		errors,
+		dataLoss,
 	)
 }
 
@@ -124,4 +142,12 @@ func CollectSystemMetrics() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	memoryUsage.Set(float64(m.Sys))
+}
+
+func RecordError(errorType string) {
+	errors.WithLabelValues(errorType).Inc()
+}
+
+func RecordDataLoss(dataLossType string) {
+	dataLoss.WithLabelValues(dataLossType).Inc()
 }

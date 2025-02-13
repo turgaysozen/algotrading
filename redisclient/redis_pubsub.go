@@ -9,6 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/services"
 )
@@ -21,6 +22,7 @@ func NewRedisClient() *redis.Client {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
+		metrics.RecordError("env_file_load_error")
 	}
 
 	redisHost := os.Getenv("REDIS_HOST")
@@ -42,9 +44,11 @@ func NewRedisClient() *redis.Client {
 			connected = false
 			retryCount++
 			log.Printf("Error connecting to Redis, retrying %d/%d... %v", retryCount, maxRetries, err)
+			metrics.RecordError("redis_connection_error")
 			client.Close()
 			if retryCount >= maxRetries {
 				log.Fatal("Max retry attempts reached, giving up.")
+				metrics.RecordDataLoss("redis_connection_max_retries")
 			}
 			time.Sleep(5 * time.Second)
 			continue
@@ -73,12 +77,14 @@ func Publish(channel string, message interface{}) {
 	data, err := json.Marshal(message)
 	if err != nil {
 		log.Println("Error serializing object:", err)
+		metrics.RecordError("redis_serialization_error")
 		return
 	}
 
 	err = redisClient.Publish(ctx, channel, data).Err()
 	if err != nil {
 		log.Println("Error publishing to Redis:", err)
+		metrics.RecordError("redis_publish_error")
 	}
 }
 
@@ -93,6 +99,7 @@ func Subscribe() {
 		err := json.Unmarshal([]byte(msg.Payload), &orderBook)
 		if err != nil {
 			log.Println("Error unmarshalling Redis message:", err)
+			metrics.RecordError("redis_unmarshal_error")
 			continue
 		}
 

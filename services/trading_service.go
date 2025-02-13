@@ -30,6 +30,8 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 	orderBookID, err := db.SaveOrderBook(orderBook.EventType, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice)
 	if err != nil {
 		log.Printf("Error saving order book: %v", err)
+		metrics.RecordError("orderbook_save_error")
+		metrics.RecordDataLoss("orderbook_save_data_loss")
 		return
 	}
 
@@ -77,6 +79,8 @@ func saveSignal(newSignal string, midPrice, shortSMA, longSMA float64, reason, s
 	err := db.SaveSignal(signal)
 	if err != nil {
 		log.Printf("Error saving signal: %v", err)
+		metrics.RecordError("signal_save_error")
+		metrics.RecordDataLoss("signal_save_data_loss")
 		return
 	}
 
@@ -98,6 +102,7 @@ func saveOrder(newSignal string, midPrice float64, symbol, latencyTrackingID str
 		err := db.CloseOrder(lastOrder.ID)
 		if err != nil {
 			log.Printf("Error closing last open order: %v", err)
+			metrics.RecordError("order_close_error")
 			return
 		}
 		log.Printf("Closing last order with ID: %d\n", lastOrder.ID)
@@ -118,6 +123,8 @@ func saveOrder(newSignal string, midPrice float64, symbol, latencyTrackingID str
 	err = db.SaveOrder(order)
 	if err != nil {
 		log.Printf("Error saving order: %v", err)
+		metrics.RecordError("order_save_error")
+		metrics.RecordDataLoss("order_save_data_loss")
 		return
 	}
 

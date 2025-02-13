@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
 )
 
@@ -24,6 +25,7 @@ func SaveOrderBook(eventType, symbol string, eventTime int64, bestBid, bestAsk f
 	err := Database.QueryRow(query, eventType, symbol, eventTime, bestBid, bestAsk).Scan(&orderBookID)
 	if err != nil {
 		log.Printf("Error saving order book: %v", err)
+		metrics.RecordError("db_save_order_book_error")
 		return 0, err
 	}
 
@@ -43,6 +45,7 @@ func SaveOrder(order models.Order) error {
 	_, err := Database.Exec(query, order.Price, order.Quantity, order.Status, order.OrderType)
 	if err != nil {
 		log.Printf("Error saving order: %v", err)
+		metrics.RecordError("db_save_order_error")
 		return err
 	}
 	return nil
@@ -64,6 +67,7 @@ func GetLastOpenOrder() (*models.Order, error) {
 			return nil, nil
 		}
 		log.Printf("Error retrieving last open order: %v", err)
+		metrics.RecordError("db_get_last_open_order_error")
 		return nil, err
 	}
 
@@ -79,6 +83,7 @@ func CloseOrder(orderID int) error {
 	_, err := Database.Exec(query, orderID)
 	if err != nil {
 		log.Printf("Error closing order with ID %d: %v", orderID, err)
+		metrics.RecordError("db_close_order_error")
 		return err
 	}
 
@@ -100,6 +105,7 @@ func SaveSignal(signal models.Signal) error {
 	_, err := Database.Exec(query, signal.Type, signal.Price, signal.ShortSMA, signal.LongSMA, signal.Reason)
 	if err != nil {
 		log.Printf("Error saving signal: %v", err)
+		metrics.RecordError("db_save_signal_error")
 		return err
 	}
 	return nil
