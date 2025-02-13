@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/monitoring/metrics"
@@ -19,12 +18,6 @@ var connected bool = false
 var redisClient *redis.Client
 
 func NewRedisClient() *redis.Client {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-		metrics.RecordError("env_file_load_error")
-	}
-
 	redisHost := os.Getenv("REDIS_HOST")
 	redisPort := os.Getenv("REDIS_PORT")
 
@@ -39,7 +32,7 @@ func NewRedisClient() *redis.Client {
 			Addr: addr,
 		})
 
-		_, err = client.Ping(context.Background()).Result()
+		_, err := client.Ping(context.Background()).Result()
 		if err != nil {
 			connected = false
 			retryCount++

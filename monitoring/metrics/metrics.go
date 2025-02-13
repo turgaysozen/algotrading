@@ -74,10 +74,11 @@ var (
 		[]string{"data_loss_type"},
 	)
 
-	activeTimers  = make(map[string]time.Time)
-	latencySums   = make(map[string]float64)
-	latencyCounts = make(map[string]int)
-	latencyMutex  = sync.Mutex{}
+	activeTimers   = make(map[string]time.Time)
+	activeTimersMu sync.Mutex
+	latencySums    = make(map[string]float64)
+	latencyCounts  = make(map[string]int)
+	latencyMutex   = sync.Mutex{}
 )
 
 func init() {
@@ -94,11 +95,19 @@ func init() {
 }
 
 func SetStartTime(metricType, latencyTrackingID string) {
+	activeTimersMu.Lock()
 	activeTimers[metricType+latencyTrackingID] = time.Now()
+	activeTimersMu.Unlock()
 }
 
 func RecordLatency(metricType, latencyTrackingID string) {
+	activeTimersMu.Lock()
 	startTime, exists := activeTimers[metricType+latencyTrackingID]
+	if exists {
+		delete(activeTimers, metricType+latencyTrackingID)
+	}
+	activeTimersMu.Unlock()
+
 	if !exists {
 		return
 	}
@@ -115,8 +124,6 @@ func RecordLatency(metricType, latencyTrackingID string) {
 	case "order":
 		orderExecutionLatency.WithLabelValues(latencyTrackingID).Set(latency)
 	}
-
-	delete(activeTimers, metricType+latencyTrackingID)
 }
 
 func updateAverageLatency(metricType string, latency float64) float64 {

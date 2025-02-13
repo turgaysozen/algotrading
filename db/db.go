@@ -2,25 +2,21 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/turgaysozen/algotrading/monitoring/metrics"
 )
 
 var Database *sql.DB
 
-func InitializeDB() (*sql.DB, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-		metrics.RecordError("db_load_env_error")
-		return nil, err
-	}
+const maxRetries = 3
+const retryDelay = 5 * time.Second
 
+func InitializeDB() (*sql.DB, error) {
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
@@ -30,24 +26,32 @@ func InitializeDB() (*sql.DB, error) {
 
 	connStr := "user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " host=" + dbHost + " port=" + dbPort + " sslmode=" + dbSslMode
 
-	Database, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatal("Error opening database connection: ", err)
-		metrics.RecordError("db_open_connection_error")
-		return nil, err
+	for i := 0; i < maxRetries; i++ {
+		db, err := sql.Open("postgres", connStr)
+		if err != nil {
+			log.Printf("Error opening database connection (attempt %d/%d): %v", i+1, maxRetries, err)
+			metrics.RecordError("db_open_connection_error")
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		db.SetMaxOpenConns(50)
+		db.SetMaxIdleConns(30)
+		db.SetConnMaxLifetime(30 * time.Minute)
+
+		if err := db.Ping(); err != nil {
+			log.Printf("Error pinging the database (attempt %d/%d): %v", i+1, maxRetries, err)
+			metrics.RecordError("db_ping_error")
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		log.Println("Database connection established successfully")
+		Database = db
+		return db, nil
 	}
 
-	Database.SetMaxOpenConns(20)
-	Database.SetMaxIdleConns(10)
-	Database.SetConnMaxLifetime(30 * time.Minute)
-
-	if err := Database.Ping(); err != nil {
-		log.Fatal("Error connecting to the database: ", err)
-		metrics.RecordError("db_ping_error")
-		return nil, err
-	}
-
-	log.Println("Database connection established successfully")
-
-	return Database, nil
+	log.Println("Failed to establish database connection after retries")
+	metrics.RecordError("db_connection_retry_failure")
+	return nil, errors.New("unable to connect to the database after multiple attempts")
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/joho/godotenv"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/monitoring/metrics"
 	"github.com/turgaysozen/algotrading/redisclient"
@@ -17,12 +16,6 @@ import (
 var Connected bool = false
 
 func ConnectWebSocket() (*websocket.Conn, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-		metrics.RecordError("env_file_load_error")
-	}
-
 	url := os.Getenv("WEB_SOCKET_URL")
 
 	if url == "" {

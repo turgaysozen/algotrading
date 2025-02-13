@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/turgaysozen/algotrading/db"
 	"github.com/turgaysozen/algotrading/monitoring"
@@ -12,6 +13,15 @@ import (
 	"github.com/turgaysozen/algotrading/redisclient"
 	"github.com/turgaysozen/algotrading/wsclient"
 )
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file:", err)
+		metrics.RecordError("env_file_load_error")
+	}
+	log.Println(".env file loaded successfully.")
+}
 
 func main() {
 	_, err := db.InitializeDB()
