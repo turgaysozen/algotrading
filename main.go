@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		log.Println("Client metrics available at http://localhost:8080/metrics")
@@ -42,5 +46,6 @@ func main() {
 
 	go redisclient.Subscribe()
 
-	select {}
+	<-ctx.Done()
+	log.Println("Shutting down gracefully...")
 }

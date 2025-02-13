@@ -15,6 +15,7 @@ import (
 
 var ctx = context.Background()
 var connected bool = false
+var redisClient *redis.Client
 
 func NewRedisClient() *redis.Client {
 	err := godotenv.Load()
@@ -60,9 +61,14 @@ func NewRedisClient() *redis.Client {
 	return client
 }
 
+func InitRedisClient() {
+	if redisClient == nil {
+		redisClient = NewRedisClient()
+	}
+}
+
 func Publish(channel string, message interface{}) {
-	client := NewRedisClient()
-	defer client.Close()
+	InitRedisClient()
 
 	data, err := json.Marshal(message)
 	if err != nil {
@@ -70,15 +76,16 @@ func Publish(channel string, message interface{}) {
 		return
 	}
 
-	err = client.Publish(ctx, channel, data).Err()
+	err = redisClient.Publish(ctx, channel, data).Err()
 	if err != nil {
 		log.Println("Error publishing to Redis:", err)
 	}
 }
 
 func Subscribe() {
-	client := NewRedisClient()
-	sub := client.Subscribe(ctx, "order_book")
+	InitRedisClient()
+
+	sub := redisClient.Subscribe(ctx, "order_book")
 
 	ch := sub.Channel()
 	for msg := range ch {

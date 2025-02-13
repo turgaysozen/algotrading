@@ -2,12 +2,12 @@ package metrics
 
 import (
 	"log"
+	"runtime"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
 )
 
 var (
@@ -99,9 +99,7 @@ func CollectSystemMetrics() {
 		cpuUsage.WithLabelValues(strconv.Itoa(i)).Set(percent)
 	}
 
-	vmStat, err := mem.VirtualMemory()
-	if err != nil {
-		log.Println("Error collecting memory usage:", err)
-	}
-	memoryUsage.Set(float64(vmStat.Used))
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memoryUsage.Set(float64(m.Sys))
 }
