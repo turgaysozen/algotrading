@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -33,10 +34,16 @@ func InitializeDB() (*sql.DB, error) {
 		return nil, err
 	}
 
+	Database.SetMaxOpenConns(20)
+	Database.SetMaxIdleConns(10)
+	Database.SetConnMaxLifetime(30 * time.Minute)
+
 	if err := Database.Ping(); err != nil {
 		log.Fatal("Error connecting to the database: ", err)
 		return nil, err
 	}
+
+	log.Println("Database connection established successfully")
 
 	return Database, nil
 }
