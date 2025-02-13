@@ -9,10 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
-	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 	"github.com/turgaysozen/algotrading/redisclient"
 )
+
+var Connected bool = false
 
 func ConnectWebSocket() (*websocket.Conn, error) {
 	err := godotenv.Load()
@@ -36,6 +38,7 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 	for {
 		conn, _, connectErr = websocket.DefaultDialer.Dial(url, nil)
 		if connectErr != nil {
+			Connected = false
 			retryCount++
 			log.Printf("Error connecting to WebSocket, retrying %d/%d... %v", retryCount, maxRetries, connectErr)
 			metrics.RecordError("websocket_connection_error")
@@ -48,9 +51,12 @@ func ConnectWebSocket() (*websocket.Conn, error) {
 			continue
 		}
 
+		Connected = true
 		log.Println("WebSocket connected to:", url)
 		break
 	}
+
+	Connected = true
 
 	return conn, nil
 }
@@ -59,6 +65,7 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
+			Connected = false
 			log.Println("Error reading WebSocket message:", err)
 			metrics.RecordError("websocket_connection_error")
 			conn.Close()
@@ -68,6 +75,8 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 			}
 			continue
 		}
+
+		Connected = true
 
 		// track latency for orderbook single data processing and avg processing
 		latencyTrackingID := uuid.New().String()

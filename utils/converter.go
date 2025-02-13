@@ -3,7 +3,7 @@ package utils
 import (
 	"strconv"
 
-	"github.com/turgaysozen/algotrading/metrics"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 )
 
 func StringToFloat64(s string) float64 {

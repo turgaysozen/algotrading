@@ -54,7 +54,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/metrics/prometheus.yml:/etc/prometheus/prometheus.yml
     restart: always
 
   grafana:

@@ -8,7 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/turgaysozen/algotrading/metrics"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 )
 
 var Database *sql.DB

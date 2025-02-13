@@ -9,8 +9,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
-	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 	"github.com/turgaysozen/algotrading/services"
 )
 
@@ -69,6 +69,15 @@ func InitRedisClient() {
 	if redisClient == nil {
 		redisClient = NewRedisClient()
 	}
+}
+
+func RedisHealth() error {
+	_, err := redisClient.Ping(context.Background()).Result()
+	if err != nil {
+		log.Println("Error pinging Redis:", err)
+		return err
+	}
+	return nil
 }
 
 func Publish(channel string, message interface{}) {

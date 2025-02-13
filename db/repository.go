@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 )
 
 func SaveOrderBook(eventType, symbol string, eventTime int64, bestBid, bestAsk float64) (int64, error) {

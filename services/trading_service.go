@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/turgaysozen/algotrading/config"
 	"github.com/turgaysozen/algotrading/db"
-	"github.com/turgaysozen/algotrading/metrics"
 	"github.com/turgaysozen/algotrading/models"
+	"github.com/turgaysozen/algotrading/monitoring/metrics"
 	"github.com/turgaysozen/algotrading/utils"
 )
 
