@@ -19,28 +19,18 @@ var (
 		},
 	)
 
-	orderbookSingleProcessingLatency = prometheus.NewGaugeVec(
+	orderExecutionAvgLatency = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "orderbook_single_processing_latency_seconds",
-			Help: "Latency of processing single order book data",
+			Name: "order_execution_avg_processing_latency_seconds",
+			Help: "Average latency of processing order execution data",
 		},
-		[]string{"latencyTrackingID"},
 	)
 
-	tradeSignalLatency = prometheus.NewGaugeVec(
+	tradingSignalAvgLatency = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "trade_signal_latency_seconds",
-			Help: "Latency of generating trade signals",
+			Name: "trading_signal_avg_processing_latency_seconds",
+			Help: "Average latency of processing trading signal data",
 		},
-		[]string{"latencyTrackingID"},
-	)
-
-	orderExecutionLatency = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "order_execution_latency_seconds",
-			Help: "Latency of executing trade orders",
-		},
-		[]string{"latencyTrackingID"},
 	)
 
 	cpuUsage = prometheus.NewGaugeVec(
@@ -84,9 +74,8 @@ var (
 func init() {
 	prometheus.MustRegister(
 		orderbookAvgLatency,
-		orderbookSingleProcessingLatency,
-		tradeSignalLatency,
-		orderExecutionLatency,
+		orderExecutionAvgLatency,
+		tradingSignalAvgLatency,
 		cpuUsage,
 		memoryUsage,
 		errors,
@@ -94,17 +83,17 @@ func init() {
 	)
 }
 
-func SetStartTime(metricType, latencyTrackingID string) {
+func SetStartTime(metricType string) {
 	activeTimersMu.Lock()
-	activeTimers[metricType+latencyTrackingID] = time.Now()
+	activeTimers[metricType] = time.Now()
 	activeTimersMu.Unlock()
 }
 
-func RecordLatency(metricType, latencyTrackingID string) {
+func RecordLatency(metricType string) {
 	activeTimersMu.Lock()
-	startTime, exists := activeTimers[metricType+latencyTrackingID]
+	startTime, exists := activeTimers[metricType]
 	if exists {
-		delete(activeTimers, metricType+latencyTrackingID)
+		delete(activeTimers, metricType)
 	}
 	activeTimersMu.Unlock()
 
@@ -117,12 +106,10 @@ func RecordLatency(metricType, latencyTrackingID string) {
 	switch metricType {
 	case "orderbook_avg":
 		orderbookAvgLatency.Set(updateAverageLatency("avg", latency))
-	case "orderbook_single":
-		orderbookSingleProcessingLatency.WithLabelValues(latencyTrackingID).Set(latency)
-	case "signal":
-		tradeSignalLatency.WithLabelValues(latencyTrackingID).Set(latency)
-	case "order":
-		orderExecutionLatency.WithLabelValues(latencyTrackingID).Set(latency)
+	case "signal_avg":
+		tradingSignalAvgLatency.Set(updateAverageLatency("avg", latency))
+	case "order_avg":
+		orderExecutionAvgLatency.Set(updateAverageLatency("avg", latency))
 	}
 }
 

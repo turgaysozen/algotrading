@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/turgaysozen/algotrading/models"
 	"github.com/turgaysozen/algotrading/monitoring/metrics"
@@ -71,10 +70,8 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 
 		Connected = true
 
-		// track latency for orderbook single data processing and avg processing
-		latencyTrackingID := uuid.New().String()
-		metrics.SetStartTime("orderbook_single", latencyTrackingID)
-		metrics.SetStartTime("orderbook_avg", "")
+		// track latency for orderbook avg processing
+		metrics.SetStartTime("orderbook_avg")
 
 		var orderBook models.OrderBook
 		err = json.Unmarshal(msg, &orderBook)
@@ -84,8 +81,6 @@ func ProcessWebSocketMessages(conn *websocket.Conn) {
 			metrics.RecordDataLoss("json_unmarshal_data_loss")
 			continue
 		}
-
-		orderBook.LatencyTrackingID = latencyTrackingID
 
 		redisclient.Publish("order_book", orderBook)
 	}

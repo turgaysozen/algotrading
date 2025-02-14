@@ -1,12 +1,11 @@
 package models
 
 type OrderBook struct {
-	LatencyTrackingID string
-	EventType         string          `json:"e"`
-	Symbol            string          `json:"s"`
-	EventTime         int64           `json:"E"`
-	Bids              [][]interface{} `json:"b"`
-	Asks              [][]interface{} `json:"a"`
+	EventType string          `json:"e"`
+	Symbol    string          `json:"s"`
+	EventTime int64           `json:"E"`
+	Bids      [][]interface{} `json:"b"`
+	Asks      [][]interface{} `json:"a"`
 }
 
 type Order struct {
