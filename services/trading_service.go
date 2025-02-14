@@ -16,6 +16,38 @@ import (
 
 var priceDataMap sync.Map
 var lastSignalMap sync.Map
+var smaMap sync.Map
+
+type SMA struct {
+	window []float64
+	period int
+	sum    float64
+}
+
+func NewSMA(period int) *SMA {
+	return &SMA{
+		window: make([]float64, 0, period),
+		period: period,
+		sum:    0,
+	}
+}
+
+// Optimize SMA calculation to O(1) complexity by using sliding window
+func (s *SMA) AddPrice(price float64) float64 {
+	s.window = append(s.window, price)
+	s.sum += price
+
+	if len(s.window) > s.period {
+		s.sum -= s.window[0]
+		s.window = s.window[1:]
+	}
+
+	if len(s.window) < s.period {
+		return 0
+	}
+
+	return s.sum / float64(s.period)
+}
 
 func ProcessOrderBook(orderBook models.OrderBook) {
 	if len(orderBook.Bids) == 0 || len(orderBook.Asks) == 0 {
@@ -41,7 +73,6 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 	log.Printf("ID: %d | Symbol: %s | EventTime: %d | Bid: %.2f | Ask: %.2f | Mid Price: %.2f\n",
 		orderBookID, orderBook.Symbol, orderBook.EventTime, bidPrice, askPrice, midPrice)
 
-	// track latency metrics for signal and order
 	latencyTrackingID := uuid.New().String()
 	metrics.SetStartTime("signal", latencyTrackingID)
 	metrics.SetStartTime("order", latencyTrackingID)
@@ -52,17 +83,30 @@ func ProcessOrderBook(orderBook models.OrderBook) {
 	appendPriceData(priceData, midPrice)
 
 	if len(*priceData) >= config.MaxPriceCount {
-		shortSMA := CalculateSMA(*priceData, config.ShortSMACount)
-		longSMA := CalculateSMA(*priceData, config.LongSMACount)
+		smaValue, _ := smaMap.LoadOrStore(orderBook.Symbol, struct {
+			shortSMA *SMA
+			longSMA  *SMA
+		}{
+			shortSMA: NewSMA(config.ShortSMACount),
+			longSMA:  NewSMA(config.LongSMACount),
+		})
+
+		sma := smaValue.(struct {
+			shortSMA *SMA
+			longSMA  *SMA
+		})
+
+		shortSMAValue := sma.shortSMA.AddPrice(midPrice)
+		longSMAValue := sma.longSMA.AddPrice(midPrice)
 
 		value, _ := lastSignalMap.LoadOrStore(orderBook.Symbol, "")
 		lastSignal := value.(string)
 
-		newSignal, reason := CheckSignal(shortSMA, longSMA, lastSignal)
+		newSignal, reason := CheckSignal(shortSMAValue, longSMAValue, lastSignal)
 
 		if newSignal != lastSignal {
 			lastSignalMap.Store(orderBook.Symbol, newSignal)
-			saveSignal(newSignal, midPrice, shortSMA, longSMA, reason, orderBook.Symbol, latencyTrackingID)
+			saveSignal(newSignal, midPrice, shortSMAValue, longSMAValue, reason, orderBook.Symbol, latencyTrackingID)
 		}
 	}
 }

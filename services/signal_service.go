@@ -9,15 +9,17 @@ func CheckSignal(shortSMA, longSMA float64, lastSignal string) (string, string) 
 	return "NO Signal", "No significant crossover"
 }
 
-func CalculateSMA(data []float64, period int) float64 {
-	if len(data) < period {
-		return 0
-	}
+// TODO: optimize SMA calculation from O(n) complexity to O(1) by using sliding window
 
-	var sum float64
-	for i := len(data) - period; i < len(data); i++ {
-		sum += data[i]
-	}
+// func CalculateSMA(data []float64, period int) float64 {
+// 	if len(data) < period {
+// 		return 0
+// 	}
 
-	return sum / float64(period)
-}
+// 	var sum float64
+// 	for i := len(data) - period; i < len(data); i++ {
+// 		sum += data[i]
+// 	}
+
+// 	return sum / float64(period)
+// }
