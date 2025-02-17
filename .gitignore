@@ -10,9 +10,6 @@
 *.out
 *.test
 
-/go.sum
-/go.mod
-
 .idea/
 .vscode/
 *.swp
